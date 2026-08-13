@@ -1,4 +1,5 @@
 # Self Audit Scanner (Tool Which Exploit 💥🔥❤️‍🔥)
+# I AM NOT RESPONSIBLE FOR ANY UNAUTHORIZED USAGE OF THIS PROJECT ! DAMMMM🫡
 
 Scan **your own** public GitHub repos (across any number of accounts you
 personally own) for accidentally leaked secrets — including secrets buried
