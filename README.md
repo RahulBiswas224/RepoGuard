@@ -1,4 +1,4 @@
-# Self Audit Scanner
+# Self Audit Scanner (Tool Which Exploit 💥🔥❤️‍🔥)
 
 Scan **your own** public GitHub repos (across any number of accounts you personally
 own) for accidentally leaked secrets — including secrets buried in old or
