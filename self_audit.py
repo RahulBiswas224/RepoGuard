@@ -139,6 +139,71 @@ def check_gitleaks_installed():
         sys.exit(1)
 
 
+def prompt_repo_selection(username, repos):
+    """
+    Show a numbered menu for one user's repos and let them choose:
+      1        -> scan all repos
+      2..N+1   -> individual repos (comma-separated for multiple, e.g. "3,5,7")
+      N+2      -> abort (skip this user entirely, no scan)
+    Returns the filtered list of repo dicts to scan (possibly empty if aborted).
+    """
+    if not repos:
+        return []
+
+    all_option = 1
+    repo_start = 2
+    abort_option = repo_start + len(repos)
+
+    print(f"\nFound {len(repos)} public repos for {username}:\n")
+    print(f"  {all_option}. Scan ALL repos")
+    for i, repo in enumerate(repos):
+        print(f" {repo_start + i:>2}. {repo['name']}")
+    print(f" {abort_option:>2}. Abort (skip {username}, scan nothing for this user)")
+
+    while True:
+        raw = input(
+            f"\nEnter your choice for {username} "
+            f"(e.g. \"{all_option}\" for all, \"{repo_start},{repo_start+1}\" for specific repos, "
+            f"\"{abort_option}\" to abort): "
+        ).strip()
+
+        if not raw:
+            print("  Please enter a choice.")
+            continue
+
+        try:
+            choices = [int(x.strip()) for x in raw.split(",") if x.strip()]
+        except ValueError:
+            print("  Invalid input — enter numbers only, comma-separated.")
+            continue
+
+        if not choices:
+            print("  Please enter at least one number.")
+            continue
+
+        if abort_option in choices:
+            print(f"  Aborted — skipping {username}.")
+            return []
+
+        if all_option in choices:
+            return repos
+
+        selected = []
+        invalid = []
+        for c in choices:
+            idx = c - repo_start
+            if 0 <= idx < len(repos):
+                selected.append(repos[idx])
+            else:
+                invalid.append(c)
+
+        if invalid:
+            print(f"  Invalid option(s): {invalid} — valid range is {all_option}-{abort_option}. Try again.")
+            continue
+
+        return selected
+
+
 def main():
     parser = argparse.ArgumentParser(description="Audit your own public GitHub repos for leaked secrets.")
     parser.add_argument("--users", nargs="+", required=True, help="Your GitHub username(s) to audit")
@@ -154,6 +219,9 @@ def main():
                          help="Redact secret values in the saved --output file (they still print to your console "
                               "during the scan). Off by default since this report stays on your own machine, but "
                               "turn it on if you might share/back up the report file.")
+    parser.add_argument("--no-interactive", action="store_true",
+                         help="Skip the repo-selection menu and scan ALL public repos for every user "
+                              "(useful for automation/cron). Off by default — the menu shows by default.")
     args = parser.parse_args()
 
     check_gitleaks_installed()
@@ -168,9 +236,16 @@ def main():
         for username in args.users:
             print(f"\n=== Auditing GitHub user: {username} ===")
             repos = list_public_repos(username, args.token)
-            print(f"Found {len(repos)} public repos")
 
-            for repo in repos:
+            if args.no_interactive:
+                print(f"Found {len(repos)} public repos — scanning all (--no-interactive)")
+                selected_repos = repos
+            else:
+                selected_repos = prompt_repo_selection(username, repos)
+                if not selected_repos:
+                    continue
+
+            for repo in selected_repos:
                 name = repo["name"]
                 clone_url = repo["clone_url"]
                 print(f"  -> Scanning {username}/{name} ...")
