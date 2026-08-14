@@ -87,16 +87,73 @@ def list_public_repos(username, token=None):
     return repos
 
 
-def clone_full_history(clone_url, dest, token=None):
-    """Full clone (no --depth) so gitleaks can scan entire history, not just HEAD."""
+HEAVY_DIR_PATTERNS = [
+    "node_modules/", "vendor/", "dist/", "build/", "out/",
+    ".venv/", "venv/", "env/", "__pycache__/",
+    "target/", ".next/", ".nuxt/", ".gradle/",
+    "bin/", "obj/", ".terraform/", "packages/",
+    ".cache/", "coverage/",
+]
+
+
+def clone_full_history(clone_url, dest, token=None, exclude_heavy=True,
+                        max_blob_size=None, extra_exclude=None):
+    """
+    Full-history clone so gitleaks can scan every commit, not just HEAD.
+
+    To avoid wasting disk/bandwidth on dependency folders and large binaries:
+      - exclude_heavy: uses sparse-checkout so common heavy dirs (node_modules,
+        dist, build, .venv, vendor, etc.) are never materialized in the working
+        tree on disk.
+      - max_blob_size: uses git's partial-clone blob filter to skip fetching
+        individual blobs above this size (e.g. "1m" for 1MB) during clone.
+
+    IMPORTANT: neither option reduces what gitleaks actually scans for secrets.
+    gitleaks scans git history/objects, not just the checked-out working tree,
+    so full commit history (including any small text files that were ever in
+    excluded folders) is still fully covered. This only trims disk usage from
+    huge dependency trees and large binary blobs that are extremely unlikely
+    to contain secrets anyway.
+    """
     if token:
-        # inject token for auth to raise rate limits / avoid throttling on clone
         clone_url = clone_url.replace("https://", f"https://{token}@")
-    result = subprocess.run(
-        ["git", "clone", "--quiet", clone_url, dest],
-        capture_output=True, text=True, timeout=600
+
+    clone_cmd = ["git", "clone", "--no-checkout", "--quiet"]
+    if max_blob_size:
+        clone_cmd += [f"--filter=blob:limit={max_blob_size}"]
+    clone_cmd += [clone_url, dest]
+
+    result = subprocess.run(clone_cmd, capture_output=True, text=True, timeout=900)
+    if result.returncode != 0:
+        return False, result.stderr
+
+    if exclude_heavy:
+        patterns = list(HEAVY_DIR_PATTERNS) + list(extra_exclude or [])
+        subprocess.run(
+            ["git", "-C", dest, "sparse-checkout", "init", "--no-cone"],
+            capture_output=True, text=True
+        )
+        sparse_file = os.path.join(dest, ".git", "info", "sparse-checkout")
+        with open(sparse_file, "w") as f:
+            f.write("/*\n")  # include everything by default
+            for pattern in patterns:
+                f.write(f"!{pattern}\n")      # exclude at repo root
+                f.write(f"!**/{pattern}\n")   # exclude nested occurrences too
+        subprocess.run(
+            ["git", "-C", dest, "sparse-checkout", "reapply"],
+            capture_output=True, text=True
+        )
+
+    checkout_result = subprocess.run(
+        ["git", "-C", dest, "checkout", "--quiet"],
+        capture_output=True, text=True, timeout=300
     )
-    return result.returncode == 0, result.stderr
+    if checkout_result.returncode != 0:
+        # Clone succeeded (history is present, which is what gitleaks needs);
+        # a checkout hiccup on an unusual default branch shouldn't kill the scan.
+        return True, f"(checkout warning, history still scanned): {checkout_result.stderr.strip()[:200]}"
+
+    return True, ""
 
 
 def run_gitleaks(repo_path, report_path):
@@ -222,6 +279,18 @@ def main():
     parser.add_argument("--no-interactive", action="store_true",
                          help="Skip the repo-selection menu and scan ALL public repos for every user "
                               "(useful for automation/cron). Off by default — the menu shows by default.")
+    parser.add_argument("--no-exclude-heavy", action="store_true",
+                         help="Don't skip heavy dependency/build folders (node_modules, dist, build, "
+                              ".venv, vendor, etc.) from the checked-out working tree. They're excluded "
+                              "by default to save disk space — this has NO effect on scan coverage, "
+                              "since gitleaks scans full git history/objects regardless.")
+    parser.add_argument("--max-blob-size", default=None, metavar="SIZE",
+                         help="Skip fetching individual git blobs larger than SIZE during clone "
+                              "(e.g. '1m' for 1MB, '500k' for 500KB). Useful to avoid downloading large "
+                              "binaries/media files. Off by default (no limit).")
+    parser.add_argument("--exclude", nargs="*", default=[],
+                         help="Additional folder patterns to exclude from the working tree, on top of "
+                              "the built-in heavy-folder list (e.g. --exclude logs/ tmp/ assets/large/)")
     args = parser.parse_args()
 
     check_gitleaks_installed()
@@ -253,7 +322,12 @@ def main():
                 dest = os.path.join(workdir, username, name)
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
 
-                ok, err = clone_full_history(clone_url, dest, args.token)
+                ok, err = clone_full_history(
+                    clone_url, dest, args.token,
+                    exclude_heavy=not args.no_exclude_heavy,
+                    max_blob_size=args.max_blob_size,
+                    extra_exclude=args.exclude,
+                )
                 if not ok:
                     print(f"     ! clone failed: {err.strip()[:200]}")
                     all_results.append({
