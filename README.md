@@ -18,7 +18,11 @@ scans repos owned by the usernames you pass in.
 2. Shows an interactive menu so you choose exactly which repos to scan —
    all of them, one, or several specific ones.
 3. Clones each selected repo with **full commit history** (not just the
-   latest snapshot).
+   latest snapshot) — but skips checking out heavy dependency/build folders
+   like `node_modules`, `dist`, `.venv`, `vendor`, etc. to save disk space
+   and clone time. This has **no effect on scan coverage** (see
+   [Heavy folder & large file exclusion](#heavy-folder--large-file-exclusion)
+   below).
 4. Runs [gitleaks](https://github.com/gitleaks/gitleaks) against the entire
    history, catching secrets even if you deleted them in a later commit —
    the old commit still holds the original content.
@@ -111,6 +115,9 @@ If you pass multiple `--users`, you get a separate menu per user.
 | `--output` | No | `audit_report.json` | Path to write the JSON summary report |
 | `--redact-output` | No | off | Redact secret values in the saved report file (they still print to your console during the scan either way) |
 | `--no-interactive` | No | off | Skip the repo-selection menu and scan **all** repos for every user — useful for automation/cron where nobody's there to answer the prompt |
+| `--no-exclude-heavy` | No | off | Disable heavy-folder exclusion — checks out `node_modules`, `dist`, `.venv`, etc. normally instead of skipping them |
+| `--max-blob-size` | No | none | Skip fetching individual git blobs larger than this size during clone, e.g. `1m` for 1MB, `500k` for 500KB |
+| `--exclude` | No | none | Extra folder patterns to exclude from checkout, on top of the built-in heavy-folder list, e.g. `--exclude logs/ tmp/` |
 
 ### Examples
 
@@ -129,6 +136,12 @@ python self_audit.py --users your-username --redact-output
 
 # No prompts — scan everything automatically (for cron/CI)
 python self_audit.py --users your-username --no-interactive
+
+# Skip large binary blobs over 2MB, plus custom folders on top of the defaults
+python self_audit.py --users your-username --max-blob-size 2m --exclude logs/ tmp/
+
+# Disable heavy-folder skipping entirely (check out everything, including node_modules)
+python self_audit.py --users your-username --no-exclude-heavy
 ```
 
 ### What a run looks like
@@ -200,6 +213,32 @@ in full to your console during the run regardless of this flag.
 
 ---
 
+## Heavy folder & large file exclusion
+
+By default, the following folders are **never checked out to disk** when a
+repo is cloned (at any depth, e.g. `packages/some-lib/node_modules/` is
+excluded too):
+
+```
+node_modules/  vendor/  dist/  build/  out/  .venv/  venv/  env/
+__pycache__/  target/  .next/  .nuxt/  .gradle/  bin/  obj/
+.terraform/  packages/  .cache/  coverage/
+```
+
+You can add more with `--exclude`, disable the whole thing with
+`--no-exclude-heavy`, and additionally skip large binary blobs (images,
+zips, media) during clone with `--max-blob-size` (e.g. `--max-blob-size 1m`).
+
+**This does not reduce what gets scanned for secrets.** gitleaks scans git's
+full commit history/object database, not just the checked-out working tree
+— so a secret committed anywhere, including inside an excluded folder or a
+large file, is still fully covered. This setting only trims disk usage and
+clone time from bulky, low-risk content (vendored dependencies, build
+output, large binaries) that essentially never contains hand-written
+credentials.
+
+---
+
 ## If something is found
 
 1. **Rotate/revoke the leaked credential immediately** at its source (Stripe
@@ -252,7 +291,9 @@ python doc_scan.py ./clones/your-username/some-repo
 - Rate limits: unauthenticated GitHub API calls are capped at 60/hr; use
   `--token` / `GITHUB_TOKEN` to raise this to 5000/hr.
 - Large repos take longer to clone/scan — this does full-history clones by
-  design, since that's where old leaked secrets hide.
+  design, since that's where old leaked secrets hide. See
+  [Heavy folder & large file exclusion](#heavy-folder--large-file-exclusion)
+  for how disk usage is kept down without losing scan coverage.
 - Findings — including the real secret value — print to your terminal.
   Don't paste that output somewhere public.
 - This tool only scans repos owned by the usernames you pass to `--users`.
