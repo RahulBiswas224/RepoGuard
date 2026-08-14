@@ -1,5 +1,24 @@
-# Self Audit Scanner (Tool Which Exploit 💥🔥❤️‍🔥)
-# I AM NOT RESPONSIBLE FOR ANY UNAUTHORIZED USAGE OF THIS PROJECT ! DAMMMM🫡
+<h1 align="center"> RepoGuard (Tool Which Exploit 💥🔥❤️‍🔥)</h1>
+<h4 align="center"> I AM NOT RESPONSIBLE FOR ANY UNAUTHORIZED USAGE OF THIS PROJECT ! DAMMMM🫡</h4>
+
+<p align="center">
+  <i>Scan your own GitHub repos before someone else finds what you missed.</i>
+</p>
+
+<p align="center">
+  <a href="https://readme-typing-svg.demolab.com/">
+    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=500&size=20&pause=1000&color=0A66C2&center=true&vCenter=true&width=600&lines=Full+git+history+secret+scanning;Gitleaks+%2B+optional+AI+doc+scanning;Zero+leftover+files+on+disk" alt="Typing SVG" />
+  </a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Gitleaks-000000?style=flat&logo=git&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Security-Audit_Tool-0A66C2?style=flat&logo=shieldsdotio&logoColor=white"/>
+  <img src="https://img.shields.io/badge/License-MIT-2E8B57?style=flat"/>
+</p>
+
+---
 
 Scan **your own** public GitHub repos (across any number of accounts you
 personally own) for accidentally leaked secrets — including secrets buried
@@ -10,7 +29,7 @@ scans repos owned by the usernames you pass in.
 
 ---
 
-## What it does
+## 📦 What it does
 
 `self_audit.py`:
 1. Pulls the list of your public repos via the GitHub API, for each
@@ -21,7 +40,7 @@ scans repos owned by the usernames you pass in.
    latest snapshot) — but skips checking out heavy dependency/build folders
    like `node_modules`, `dist`, `.venv`, `vendor`, etc. to save disk space
    and clone time. This has **no effect on scan coverage** (see
-   [Heavy folder & large file exclusion](#heavy-folder--large-file-exclusion)
+   [Heavy folder & large file exclusion](#-heavy-folder--large-file-exclusion)
    below).
 4. Runs [gitleaks](https://github.com/gitleaks/gitleaks) against the entire
    history, catching secrets even if you deleted them in a later commit —
@@ -39,7 +58,7 @@ credentials pasted into prose, confidential markers, etc.
 
 ---
 
-## Setup
+## ⚙️ Setup
 
 ```bash
 # 1. Install gitleaks
@@ -71,7 +90,7 @@ python --version   # or python3, depending on your OS
 
 ---
 
-## Usage
+## 🚀 Usage
 
 ### Basic scan (interactive)
 
@@ -213,7 +232,7 @@ in full to your console during the run regardless of this flag.
 
 ---
 
-## Heavy folder & large file exclusion
+## 🧹 Heavy folder & large file exclusion
 
 By default, the following folders are **never checked out to disk** when a
 repo is cloned (at any depth, e.g. `packages/some-lib/node_modules/` is
@@ -239,7 +258,7 @@ credentials.
 
 ---
 
-## If something is found
+## 🔑 If something is found
 
 1. **Rotate/revoke the leaked credential immediately** at its source (Stripe
    dashboard, AWS IAM, database provider, etc.) — treat it as compromised
@@ -258,7 +277,7 @@ credentials.
 
 ---
 
-## Scan documents in a specific repo (optional)
+## 📄 Scan documents in a specific repo (optional)
 
 ```bash
 python self_audit.py --users your-username --keep-clones --workdir ./clones
@@ -267,7 +286,7 @@ python doc_scan.py ./clones/your-username/some-repo
 
 ---
 
-## Cleanup and disk safety
+## 🗑️ Cleanup and disk safety
 
 - Every cloned repo is deleted immediately after it's scanned, not just at
   the end of the whole run.
@@ -284,7 +303,7 @@ python doc_scan.py ./clones/your-username/some-repo
 
 ---
 
-## Notes
+## 📝 Notes
 
 - Runs entirely on your own machine — no data sent anywhere except: (a)
   GitHub API/clone (standard), (b) Gemini API only if you run `doc_scan.py`.
@@ -292,7 +311,7 @@ python doc_scan.py ./clones/your-username/some-repo
   `--token` / `GITHUB_TOKEN` to raise this to 5000/hr.
 - Large repos take longer to clone/scan — this does full-history clones by
   design, since that's where old leaked secrets hide. See
-  [Heavy folder & large file exclusion](#heavy-folder--large-file-exclusion)
+  [Heavy folder & large file exclusion](#-heavy-folder--large-file-exclusion)
   for how disk usage is kept down without losing scan coverage.
 - Findings — including the real secret value — print to your terminal.
   Don't paste that output somewhere public.
@@ -300,3 +319,9 @@ python doc_scan.py ./clones/your-username/some-repo
   It has no feature to scan an arbitrary user's account, and shouldn't be
   modified to do so — running it against accounts you don't own or haven't
   been authorized to audit is a misuse of the tool.
+
+---
+
+<p align="center">
+  <i>Built by <a href="https://github.com/RahulBiswas224">Rahul Biswas</a> — part of a growing security/DevOps tooling portfolio.</i>
+</p>
