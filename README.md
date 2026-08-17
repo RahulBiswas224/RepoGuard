@@ -158,7 +158,6 @@ python self_audit.py --users your-username --no-interactive
 
 # Skip large binary blobs over 2MB, plus custom folders on top of the defaults
 python self_audit.py --users your-username --max-blob-size 2m --exclude logs/ tmp/
-
 # Disable heavy-folder skipping entirely (check out everything, including node_modules)
 python self_audit.py --users your-username --no-exclude-heavy
 ```
