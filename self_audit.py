@@ -271,7 +271,11 @@ def main():
                               "Deleted automatically when the scan finishes, unless --keep-clones is set.")
     parser.add_argument("--keep-clones", action="store_true",
                          help="Keep cloned repos on disk after scanning (off by default — cleanup is automatic).")
-    parser.add_argument("--output", default="audit_report.json", help="Path to write the final JSON summary report")
+    parser.add_argument("--output", default=None,
+                         help="Path to write the final JSON summary report. If not given, this is "
+                              "auto-generated from the username(s) you pass to --users, e.g. "
+                              "'RahulBiswas224_audit_report.json' for one user, or "
+                              "'RahulBiswas224_user2_audit_report.json' for multiple.")
     parser.add_argument("--redact-output", action="store_true",
                          help="Redact secret values in the saved --output file (they still print to your console "
                               "during the scan). Off by default since this report stays on your own machine, but "
@@ -292,6 +296,13 @@ def main():
                          help="Additional folder patterns to exclude from the working tree, on top of "
                               "the built-in heavy-folder list (e.g. --exclude logs/ tmp/ assets/large/)")
     args = parser.parse_args()
+
+    # Auto-name the report after the username(s) scanned, unless --output was
+    # explicitly given. Keeps runs for different accounts from overwriting
+    # each other's report by default.
+    if args.output is None:
+        safe_names = ["".join(c if c.isalnum() or c in "-_" else "_" for c in u) for u in args.users]
+        args.output = "_".join(safe_names) + "_audit_report.json"
 
     check_gitleaks_installed()
 
